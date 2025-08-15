@@ -3,14 +3,7 @@ use std::{ fs::{ self, File }, io::Read, sync::Arc };
 use skia_safe::{ Color4f, Font, FontMgr, Paint, Point, Size, Typeface };
 use winit::{ application::ApplicationHandler, dpi::PhysicalSize, event::WindowEvent, event_loop::ActiveEventLoop, window::{ Icon, Window, WindowAttributes, WindowId } };
 
-use crate::{ context::VulkanRenderContext, renderer::VulkanRenderer };
-
-#[derive(Default)]
-pub struct AppCreateInfo{
-  pub title: String,
-  pub size: ( u32, u32 ),
-  pub icon: Option<String>
-}
+use crate::{ context::VulkanRenderContext, renderer::VulkanRenderer, AppCreateInfo };
 
 #[derive(Default)]
 pub struct App{
