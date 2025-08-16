@@ -13,7 +13,7 @@ use vulkano::{
 
 use winit::{ event_loop::ActiveEventLoop, window::Window };
 
-use crate::renderer::VulkanRenderer;
+use crate::renderer::vulkan::vulkan_renderer::VulkanRenderer;
 
 #[derive(Default)]
 pub struct VulkanRenderContext{
