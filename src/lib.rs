@@ -1,6 +1,5 @@
-use std::thread;
-
-use winit::event_loop::{ControlFlow, EventLoop};
+use skia_safe::Canvas;
+use winit::{ dpi::LogicalSize, event_loop::{ ControlFlow, EventLoop } };
 
 use crate::app::App;
 
@@ -17,15 +16,13 @@ pub struct AppCreateInfo{
   pub name: &'static str
 }
 
-pub fn build<F>( info: AppCreateInfo, f: F )
+pub fn build<F>( info: AppCreateInfo, render: F )
 where
-  F: FnOnce(&mut App)
+  F: Fn(&Canvas, LogicalSize<f32>)
 {
   let event_loop = EventLoop::new().unwrap();
-  let mut app = App::new(info);
+  let mut app = App::new(info, render);
 
   event_loop.set_control_flow(ControlFlow::Wait);
-
-  f(&mut app);
   event_loop.run_app(&mut app).ok();
 }

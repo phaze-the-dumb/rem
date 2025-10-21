@@ -3,21 +3,29 @@ use std::{ fs, path::PathBuf, sync::Arc };
 use skia_safe::{ Canvas, Color4f, Size };
 use winit::{ application::ApplicationHandler, dpi::{LogicalSize, PhysicalSize}, event::WindowEvent, event_loop::ActiveEventLoop, window::{ Icon, Window, WindowId } };
 
-use crate::{ app::{config::AppConfig, node::Node}, renderer::Renderer, structs::config::Config, AppCreateInfo };
+use crate::{ app::config::AppConfig, renderer::Renderer, structs::config::Config, AppCreateInfo };
 
 mod config;
-pub mod node;
 
-pub struct App{
+pub struct App<F>
+where
+  F: Fn(&Canvas, LogicalSize<f32>)
+{
   renderer: Renderer,
   create_info: AppCreateInfo,
   config: AppConfig,
-  loaded_view: Vec<Node>,
-  window: Option<Arc<Window>>
+  window: Option<Arc<Window>>,
+  render: F
 }
 
-impl App{
-  pub fn new( info: AppCreateInfo ) -> Self{
+impl<F> App<F>
+where
+  F: Fn(&Canvas, LogicalSize<f32>)
+{
+  pub fn new( info: AppCreateInfo, render: F ) -> Self
+  where
+    F: Fn(&Canvas, LogicalSize<f32>)
+  {
     let config_dir = dirs::config_dir().unwrap().join(info.name);
     if !config_dir.exists() { fs::create_dir(&config_dir).unwrap(); }
 
@@ -36,8 +44,8 @@ impl App{
       create_info: info,
       config: AppConfig::new(config_file_dir),
       renderer: Renderer::new(config.renderer),
-      loaded_view: Vec::new(),
-      window: None
+      window: None,
+      render: render
     };
 
     app
@@ -46,13 +54,12 @@ impl App{
   pub fn get_dir( &self ) -> PathBuf{
     dirs::config_dir().unwrap().join(self.create_info.name)
   }
-
-  pub fn load_view( &mut self, nodes: Vec<Node> ){
-    self.loaded_view = nodes;
-  }
 }
 
-impl ApplicationHandler for App{
+impl<F> ApplicationHandler for App<F>
+where
+  F: Fn(&Canvas, LogicalSize<f32>)
+{
   fn resumed(&mut self, event_loop: &ActiveEventLoop) {
     let mut icon = None;
 
@@ -72,10 +79,13 @@ impl ApplicationHandler for App{
       .with_title(self.create_info.title)
       .with_inner_size(winit::dpi::Size::Physical(
         PhysicalSize::new(self.create_info.size.0, self.create_info.size.1)
-      ))
-      .with_window_icon(icon);
+      ));
 
     let window = Arc::new(event_loop.create_window(attr).unwrap());
+
+    if icon.is_some(){
+      window.set_window_icon(icon);
+    }
 
     self.window = Some(window.clone());
     self.renderer.resumed(window, event_loop);
@@ -96,10 +106,9 @@ impl ApplicationHandler for App{
       }
       WindowEvent::RedrawRequested => {
         self.renderer.render(| canvas: &Canvas, size: LogicalSize<f32> | {
-          let canvas_size = Size::new(size.width, size.height);
-          canvas.clear(Color4f::new(1.0, 1.0, 1.0, 1.0));
+          let render = &self.render;
 
-          for node in &self.loaded_view{ node.render(canvas); }
+          render(canvas, size);
         });
       },
       _ => {}
