@@ -1,7 +1,7 @@
 use std::{ fs, path::PathBuf, sync::Arc };
 
-use skia_safe::{ Canvas, Color4f, Size };
-use winit::{ application::ApplicationHandler, dpi::{LogicalSize, PhysicalSize}, event::WindowEvent, event_loop::ActiveEventLoop, window::{ Icon, Window, WindowId } };
+use skia_safe::Canvas;
+use winit::{ application::ApplicationHandler, dpi::{LogicalSize, PhysicalSize}, event::WindowEvent, event_loop::{ActiveEventLoop, ControlFlow, EventLoop}, window::{ Icon, Window, WindowId } };
 
 use crate::{ app::config::AppConfig, renderer::Renderer, structs::config::Config, AppCreateInfo };
 
@@ -13,9 +13,10 @@ where
 {
   renderer: Renderer,
   create_info: AppCreateInfo,
-  config: AppConfig,
+  _config: AppConfig,
   window: Option<Arc<Window>>,
-  render: F
+  render: F,
+  event: Option<Box<dyn Fn(&App<F>, WindowEvent)>>
 }
 
 impl<F> App<F>
@@ -42,10 +43,11 @@ where
 
     let app = Self {
       create_info: info,
-      config: AppConfig::new(config_file_dir),
+      _config: AppConfig::new(config_file_dir),
       renderer: Renderer::new(config.renderer),
       window: None,
-      render: render
+      render: render,
+      event: None
     };
 
     app
@@ -53,6 +55,22 @@ where
 
   pub fn get_dir( &self ) -> PathBuf{
     dirs::config_dir().unwrap().join(self.create_info.name)
+  }
+
+  pub fn events( &mut self, listener: Box<dyn Fn(&App<F>, WindowEvent)> ){
+    self.event = Some(listener);
+  }
+
+  pub fn run( &mut self ){
+    let event_loop = EventLoop::new().unwrap();
+
+    event_loop.set_control_flow(ControlFlow::Wait);
+    event_loop.run_app(self).ok();
+  }
+
+  pub fn redraw( &self ){
+    if self.window.is_some(){
+      self.window.as_ref().unwrap().request_redraw(); }
   }
 }
 
@@ -94,7 +112,7 @@ where
   fn window_event(
     &mut self,
     event_loop: &ActiveEventLoop,
-    window_id: WindowId,
+    _window_id: WindowId,
     event: WindowEvent,
   ) {
     match event{
@@ -103,6 +121,12 @@ where
       },
       WindowEvent::Resized(_) => {
         self.renderer.resized();
+
+        let event_cb = &self.event;
+        if event_cb.is_some(){
+          let event_cb = event_cb.as_ref().unwrap();
+          event_cb(self, event);
+        }
       }
       WindowEvent::RedrawRequested => {
         self.renderer.render(| canvas: &Canvas, size: LogicalSize<f32> | {
@@ -110,6 +134,34 @@ where
 
           render(canvas, size);
         });
+      },
+      WindowEvent::CursorMoved { device_id: _, position: _ } => {
+        let event_cb = &self.event;
+        if event_cb.is_some(){
+          let event_cb = event_cb.as_ref().unwrap();
+          event_cb(self, event);
+        }
+      },
+      WindowEvent::MouseInput { device_id: _, state: _, button: _ } => {
+        let event_cb = &self.event;
+        if event_cb.is_some(){
+          let event_cb = event_cb.as_ref().unwrap();
+          event_cb(self, event);
+        }
+      },
+      WindowEvent::MouseWheel { device_id: _, delta: _, phase: _ } => {
+        let event_cb = &self.event;
+        if event_cb.is_some(){
+          let event_cb = event_cb.as_ref().unwrap();
+          event_cb(self, event);
+        }
+      },
+      WindowEvent::KeyboardInput { device_id: _, event: _, is_synthetic: _ } => {
+        let event_cb = &self.event;
+        if event_cb.is_some(){
+          let event_cb = event_cb.as_ref().unwrap();
+          event_cb(self, event);
+        }
       },
       _ => {}
     }
